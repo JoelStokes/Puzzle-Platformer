@@ -5,8 +5,8 @@ using UnityEngine;
 public class Powerup : MonoBehaviour
 {
     public enum PowerType {
-        jump,
-        walljump,
+        hiJump,
+        wallJump,
         key
     };
 

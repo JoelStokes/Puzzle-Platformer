@@ -33,7 +33,7 @@ public class PlayerController : MonoBehaviour
     //Walljump
     private bool onLeftWall = false;
     private bool onRightWall = false;
-    private float wallSlowMax = 5;   //Only applied moving downwards
+    private float wallSlowMax = 2.5f;   //Only applied moving downwards
     private float wallJumpOutwardsForce = 8;
     private float wallJumpUpwardsForce = 12f;
     private float wallJumpTimer = 0;
@@ -55,13 +55,14 @@ public class PlayerController : MonoBehaviour
     private float maxVelocity = 20; //Prevent player from moving too quickly
 
     //Powerups
-    private bool hiJump = false;
-    private bool wallJump = false;
+    private bool wallJumpCollected = false;
     private int keys = 0;
 
     //Components
     private Rigidbody2D rigi;
     private BoxCollider2D boxCollider;
+    private ParticleSystem particles;
+    private float particlePosition = .5f;
 
     void Start()
     {
@@ -69,6 +70,7 @@ public class PlayerController : MonoBehaviour
         groundLayerMask = LayerMask.GetMask("Ground") | LayerMask.GetMask("One-Way");
         wallJumpLayerMask = LayerMask.GetMask("Ground");
         boxCollider = GetComponent<BoxCollider2D>();
+        particles = GetComponent<ParticleSystem>();
     }
 
     void Update()
@@ -138,6 +140,17 @@ public class PlayerController : MonoBehaviour
             jumpEnding = false;
         }
 
+        if (onLeftWall || onRightWall){
+            ApplyWallSlow();
+            if (rigi.velocity.y < 0){   //Only emit particles if sliding downwards
+                HandleParticles();
+            }
+        } else {
+            if (particles.isEmitting){
+                particles.Stop();
+            }
+        }
+
         rigi.velocity = Vector2.ClampMagnitude(rigi.velocity, maxVelocity); //Prevent falling too fast, avoid clipping through walls
     }
 
@@ -152,26 +165,42 @@ public class PlayerController : MonoBehaviour
     }
 
     private void CheckWalls(){
-        RaycastHit2D leftRaycastHit = Physics2D.BoxCast(boxCollider.bounds.center, boxCollider.bounds.size, 0f, Vector2.left, groundedHeight, wallJumpLayerMask);
+        if (wallJumpCollected){
+            RaycastHit2D leftRaycastHit = Physics2D.BoxCast(boxCollider.bounds.center, boxCollider.bounds.size, 0f, Vector2.left, groundedHeight, wallJumpLayerMask);
 
-        if (leftRaycastHit.collider != null && currentMove < -deadZone){
-            onLeftWall = true;
-        } else {
-            if (onLeftWall){    //Was previously in wall slide, give grace period
-                wallSlideLeftTimer = wallSlideCount;
+            if (leftRaycastHit.collider != null && currentMove < -deadZone){
+                onLeftWall = true;
+            } else {
+                if (onLeftWall){    //Was previously in wall slide, give grace period
+                    wallSlideLeftTimer = wallSlideCount;
+                }
+                onLeftWall = false;
             }
-            onLeftWall = false;
+
+            RaycastHit2D rightRaycastHit = Physics2D.BoxCast(boxCollider.bounds.center, boxCollider.bounds.size, 0f, Vector2.right, groundedHeight, wallJumpLayerMask);
+
+            if (rightRaycastHit.collider != null && currentMove > deadZone){
+                onRightWall = true;
+            } else {
+                if (onRightWall){
+                    wallSlideRightTimer = wallSlideCount;
+                }
+                onRightWall = false;
+            }   
         }
+    }
 
-        RaycastHit2D rightRaycastHit = Physics2D.BoxCast(boxCollider.bounds.center, boxCollider.bounds.size, 0f, Vector2.right, groundedHeight, wallJumpLayerMask);
+    private void HandleParticles(){
+        if (!particles.isEmitting){
+            ParticleSystem.ShapeModule shape = particles.shape;
 
-        if (rightRaycastHit.collider != null && currentMove > deadZone){
-            onRightWall = true;
-        } else {
-            if (onRightWall){
-                wallSlideRightTimer = wallSlideCount;
+            if (onLeftWall){
+                shape.position = new Vector3(-particlePosition, 0, -1);
+            } else {
+                shape.position = new Vector3(particlePosition, 0, -1);
             }
-            onRightWall = false;
+
+            particles.Play();
         }
     }
 
@@ -266,9 +295,28 @@ public class PlayerController : MonoBehaviour
         }
     }
 
+    private void SetPowerup(string newPowerup){
+        switch (newPowerup){
+            case "hiJump":
+                jumpStartForce = jumpStartForce * 1.35f;
+                break;
+            case "wallJump":
+                wallJumpCollected = true;
+                break;
+            case "key":
+                keys++;
+                break;
+        }
+
+        //Add Icon to UI that matches newly collected power
+    }
+
     void OnTriggerEnter2D(Collider2D other) {
         if (other.tag == "Powerup"){
-            //Need dynamic system to quickly set one of many different powerup types
+            SetPowerup(other.GetComponent<Powerup>().currentPower.ToString());
+            Destroy(other.gameObject);
+        } else if (other.tag == "Hurt"){
+            //Die
         }
     }
 }
