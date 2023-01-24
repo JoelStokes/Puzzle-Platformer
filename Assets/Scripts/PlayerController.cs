@@ -51,6 +51,18 @@ public class PlayerController : MonoBehaviour
     private float groundedCount =.05f;
     private Vector2 groundPos;
 
+    //Ladder
+    private float verticalMove = 0;
+    private bool nearLadder = false;
+    private float ladderSpeed = 5;
+    private bool isClimbing = false;
+    private float ladderX;
+    private float ladderTop;
+    private float ladderTopBuffer = .3f;
+    private float regrabTimer = 0;
+    private float regrabLim = .25f;
+    private float startGravity;
+
     //Fall
     private float maxVelocity = 20; //Prevent player from moving too quickly
 
@@ -71,6 +83,8 @@ public class PlayerController : MonoBehaviour
         wallJumpLayerMask = LayerMask.GetMask("Ground");
         boxCollider = GetComponent<BoxCollider2D>();
         particles = GetComponent<ParticleSystem>();
+
+        startGravity = rigi.gravityScale;
     }
 
     void Update()
@@ -98,9 +112,35 @@ public class PlayerController : MonoBehaviour
         if (wallSlideRightTimer > 0){
             wallSlideRightTimer -= Time.deltaTime;
         }
+
+        if (nearLadder && verticalMove > deadZone && regrabTimer <= 0){
+            isClimbing = true;
+            transform.position = new Vector3(ladderX, transform.position.y, transform.position.z);
+        }
+
+        if (regrabTimer > 0){
+            regrabTimer -= Time.deltaTime;
+        }
     }
 
     void FixedUpdate() {
+        if (isClimbing){
+            regrabTimer = regrabLim;
+            rigi.gravityScale = 0;
+            if (transform.position.y < (ladderTop + ladderTopBuffer) || verticalMove < 0){
+                rigi.velocity =  new Vector2(0, verticalMove * ladderSpeed);
+            } else {
+                rigi.velocity =  Vector2.zero;
+            }
+            isGrounded = true;
+
+            if (verticalMove < -deadZone && CheckGrounded()){
+                isClimbing = false;
+            }
+        } else {
+            rigi.gravityScale = startGravity;
+        }
+
         if (CheckGrounded()){   //Set Grounded
             groundedTimer = groundedCount;
             isGrounded = true;
@@ -114,7 +154,7 @@ public class PlayerController : MonoBehaviour
             onRightWall = false;
         }
 
-        if (wallJumpTimer <= 0){     //Move
+        if (wallJumpTimer <= 0 && !isClimbing){     //Move
             if (currentMove > deadZone){
                 ApplyMove(1);
             } else if (currentMove < -deadZone){
@@ -127,6 +167,7 @@ public class PlayerController : MonoBehaviour
         if (jumpStarting && isGrounded){    //Jump
             ApplyJump(jumpStartForce);
             jumpStarting = false;
+            isClimbing = false;
             jumpPressedTimer = 0;
             groundedTimer = 0;
         } else if (jumpStarting && ((onLeftWall || onRightWall) || (wallSlideLeftTimer > 0 || wallSlideRightTimer > 0)) && wallJumpTimer <= 0){
@@ -287,6 +328,10 @@ public class PlayerController : MonoBehaviour
         currentMove = context.ReadValue<float>();
     }
 
+    public void UpAndDown(InputAction.CallbackContext context){
+        verticalMove = context.ReadValue<float>();
+    }
+
     public void Walk(InputAction.CallbackContext context){
         if (context.phase == InputActionPhase.Started){
             walking = true;
@@ -317,6 +362,17 @@ public class PlayerController : MonoBehaviour
             Destroy(other.gameObject);
         } else if (other.tag == "Hurt"){
             //Die
+        } else if (other.tag == "Ladder"){
+            nearLadder = true;
+            ladderX = other.gameObject.transform.position.x;
+            ladderTop = other.gameObject.transform.position.y;
+        }
+    }
+
+    void OnTriggerExit2D(Collider2D other) {
+        if (other.tag == "Ladder"){
+            nearLadder = false;
+            isClimbing = false;
         }
     }
 }
