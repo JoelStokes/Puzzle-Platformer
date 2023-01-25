@@ -58,10 +58,12 @@ public class PlayerController : MonoBehaviour
     private bool isClimbing = false;
     private float ladderX;
     private float ladderTop;
-    private float ladderTopBuffer = .3f;
+    private float ladderTopBuffer = .5f;
     private float regrabTimer = 0;
     private float regrabLim = .25f;
     private float startGravity;
+    private int playerMask;
+    private int oneWayMask;
 
     //Fall
     private float maxVelocity = 20; //Prevent player from moving too quickly
@@ -85,6 +87,8 @@ public class PlayerController : MonoBehaviour
         particles = GetComponent<ParticleSystem>();
 
         startGravity = rigi.gravityScale;
+        oneWayMask = LayerMask.NameToLayer("One-Way");
+        playerMask = LayerMask.NameToLayer("Player");
     }
 
     void Update()
@@ -113,9 +117,14 @@ public class PlayerController : MonoBehaviour
             wallSlideRightTimer -= Time.deltaTime;
         }
 
-        if (nearLadder && verticalMove > deadZone && regrabTimer <= 0){
+        if (nearLadder && (verticalMove > deadZone || verticalMove < -deadZone) && regrabTimer <= 0){
             isClimbing = true;
-            transform.position = new Vector3(ladderX, transform.position.y, transform.position.z);
+            Physics2D.IgnoreLayerCollision(playerMask, oneWayMask, true);
+            if (transform.position.y > ladderTop){
+                transform.position = new Vector3(ladderX, ladderTop, transform.position.z);
+            } else {
+                transform.position = new Vector3(ladderX, transform.position.y, transform.position.z);
+            }
         }
 
         if (regrabTimer > 0){
@@ -127,7 +136,7 @@ public class PlayerController : MonoBehaviour
         if (isClimbing){
             regrabTimer = regrabLim;
             rigi.gravityScale = 0;
-            if (transform.position.y < (ladderTop + ladderTopBuffer) || verticalMove < 0){
+            if (transform.position.y < ladderTop || verticalMove < 0){
                 rigi.velocity =  new Vector2(0, verticalMove * ladderSpeed);
             } else {
                 rigi.velocity =  Vector2.zero;
@@ -135,7 +144,7 @@ public class PlayerController : MonoBehaviour
             isGrounded = true;
 
             if (verticalMove < -deadZone && CheckGrounded()){
-                isClimbing = false;
+                StopClimbing();
             }
         } else {
             rigi.gravityScale = startGravity;
@@ -167,7 +176,7 @@ public class PlayerController : MonoBehaviour
         if (jumpStarting && isGrounded){    //Jump
             ApplyJump(jumpStartForce);
             jumpStarting = false;
-            isClimbing = false;
+            StopClimbing();
             jumpPressedTimer = 0;
             groundedTimer = 0;
         } else if (jumpStarting && ((onLeftWall || onRightWall) || (wallSlideLeftTimer > 0 || wallSlideRightTimer > 0)) && wallJumpTimer <= 0){
@@ -291,7 +300,9 @@ public class PlayerController : MonoBehaviour
     }
 
     private void ApplyJump(float value){
-        rigi.velocity = new Vector2(rigi.velocity.x, value);
+        if (!isClimbing || verticalMove > -deadZone){
+            rigi.velocity = new Vector2(rigi.velocity.x, value);
+        }
     }
 
     private void ApplyWallJump(){
@@ -312,6 +323,11 @@ public class PlayerController : MonoBehaviour
         if (rigi.velocity.y < -wallSlowMax){
             rigi.velocity = new Vector2(rigi.velocity.x, -wallSlowMax);
         }
+    }
+
+    private void StopClimbing(){
+        Physics2D.IgnoreLayerCollision(playerMask, oneWayMask, false);
+        isClimbing = false;
     }
 
 
@@ -365,7 +381,7 @@ public class PlayerController : MonoBehaviour
         } else if (other.tag == "Ladder"){
             nearLadder = true;
             ladderX = other.gameObject.transform.position.x;
-            ladderTop = other.gameObject.transform.position.y;
+            ladderTop = other.gameObject.transform.position.y + ladderTopBuffer;
         }
     }
 
