@@ -53,3 +53,6 @@ TagManager:
   - name: Player
     uniqueID: 2701195439
     locked: 0
+  - name: Close Decoration
+    uniqueID: 1480005579
+    locked: 0
