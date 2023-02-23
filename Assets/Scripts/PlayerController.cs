@@ -74,7 +74,7 @@ public class PlayerController : MonoBehaviour
 
     //Box
     private float pushTimer = 0;
-    private float pushLim = .1f;
+    private float pushLim = .15f;
     private float pushYLim = .25f;  // y coordinate needs to be within this to push. Prevent push from top/bottom
 
     //Components
@@ -399,24 +399,29 @@ public class PlayerController : MonoBehaviour
 
     private void OnCollisionStay2D(Collision2D other) {
         if (other.collider.tag == "Box"){
-            if (transform.position.y > other.gameObject.transform.position.y - pushYLim && transform.position.y < other.gameObject.transform.position.y + pushYLim &&
-                (currentMove > 0.5f || currentMove < 0.5f)){
+            Debug.Log("Pushing, Push Time: " + pushTimer + ", Current Move: " + currentMove + ", Y: " + transform.position.y + ", other Y: " + other.gameObject.transform.position.y);
+
+            if (isGrounded && !isClimbing && transform.position.y > other.gameObject.transform.position.y - pushYLim && 
+                transform.position.y < other.gameObject.transform.position.y + pushYLim && (currentMove >= .9f - deadZone || currentMove <= -.9f + deadZone)){
                 pushTimer += Time.deltaTime;
-            } else {
-                pushTimer = 0;
+
+                if (pushTimer > pushLim){
+                    if (transform.position.x > other.gameObject.transform.position.x){
+                        other.gameObject.GetComponent<Box>().Push(true);
+                    } else if (transform.position.x < other.gameObject.transform.position.x) {
+                        other.gameObject.GetComponent<Box>().Push(false);
+                    }
+
+                    pushTimer = 0;
+                }
+
             }
 
-            if (isGrounded && !isClimbing && pushTimer > pushLim){
-                if (transform.position.x > other.gameObject.transform.position.x){
-                    other.gameObject.GetComponent<Box>().Push(true);
-                } else if (transform.position.x < other.gameObject.transform.position.x) {
-                    other.gameObject.GetComponent<Box>().Push(false);
-                }
-            }
         }
     }
 
     private void OnCollisionExit2D(Collision2D other) {
+        Debug.Log("Push End");
         if (other.collider.tag == "Box"){
             pushTimer = 0;
         }
