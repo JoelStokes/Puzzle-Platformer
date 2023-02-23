@@ -10,7 +10,7 @@ public class PlayerController : MonoBehaviour
     private float accelerationSpeed = .6f;
     private float maxSpeed = 8.5f;
     private float currentMove = 0;
-    private float deadZone = .6f;
+    private float deadZone = .25f;
     private float dampingGround = .8f;
     private float dampingAir = .9f;
     private float dampingTurn = .7f;
@@ -72,6 +72,11 @@ public class PlayerController : MonoBehaviour
     private bool wallJumpCollected = false;
     private int keys = 0;
 
+    //Box
+    private float pushTimer = 0;
+    private float pushLim = .1f;
+    private float pushYLim = .25f;  // y coordinate needs to be within this to push. Prevent push from top/bottom
+
     //Components
     private Rigidbody2D rigi;
     private BoxCollider2D boxCollider;
@@ -81,8 +86,8 @@ public class PlayerController : MonoBehaviour
     void Start()
     {
         rigi = GetComponent<Rigidbody2D>();
-        groundLayerMask = LayerMask.GetMask("Ground") | LayerMask.GetMask("One-Way");
-        wallJumpLayerMask = LayerMask.GetMask("Ground");
+        groundLayerMask = LayerMask.GetMask("Ground") | LayerMask.GetMask("One-Way") | LayerMask.GetMask("Box");
+        wallJumpLayerMask = LayerMask.GetMask("Ground") | LayerMask.GetMask("Box");
         boxCollider = GetComponent<BoxCollider2D>();
         particles = GetComponent<ParticleSystem>();
 
@@ -389,6 +394,31 @@ public class PlayerController : MonoBehaviour
         if (other.tag == "Ladder"){
             nearLadder = false;
             isClimbing = false;
+        }
+    }
+
+    private void OnCollisionStay2D(Collision2D other) {
+        if (other.collider.tag == "Box"){
+            if (transform.position.y > other.gameObject.transform.position.y - pushYLim && transform.position.y < other.gameObject.transform.position.y + pushYLim &&
+                (currentMove > 0.5f || currentMove < 0.5f)){
+                pushTimer += Time.deltaTime;
+            } else {
+                pushTimer = 0;
+            }
+
+            if (isGrounded && !isClimbing && pushTimer > pushLim){
+                if (transform.position.x > other.gameObject.transform.position.x){
+                    other.gameObject.GetComponent<Box>().Push(true);
+                } else if (transform.position.x < other.gameObject.transform.position.x) {
+                    other.gameObject.GetComponent<Box>().Push(false);
+                }
+            }
+        }
+    }
+
+    private void OnCollisionExit2D(Collision2D other) {
+        if (other.collider.tag == "Box"){
+            pushTimer = 0;
         }
     }
 }

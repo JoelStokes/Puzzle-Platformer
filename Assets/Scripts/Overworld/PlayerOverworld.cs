@@ -5,7 +5,7 @@ using UnityEngine.InputSystem;
 
 public class PlayerOverworld : MonoBehaviour
 {
-    private float deadZone = .6f;
+    private float deadZone = .25f;
     private bool moving = false;
 
     private float moveX;
