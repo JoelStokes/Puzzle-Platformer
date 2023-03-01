@@ -138,6 +138,8 @@ public class PlayerController : MonoBehaviour
     }
 
     void FixedUpdate() {
+        SetFacingDirection();
+
         if (isClimbing){
             regrabTimer = regrabLim;
             rigi.gravityScale = 0;
@@ -293,6 +295,14 @@ public class PlayerController : MonoBehaviour
         rigi.velocity = new Vector2(newSpeed, rigi.velocity.y);
     }
 
+    private void SetFacingDirection(){
+        if (currentMove > 0 + deadZone){
+            transform.localScale = new Vector3(Mathf.Abs(transform.localScale.x), transform.localScale.y, transform.localScale.z);
+        } else if (currentMove < 0 - deadZone){
+            transform.localScale = new Vector3(Mathf.Abs(transform.localScale.x) * -1, transform.localScale.y, transform.localScale.z);
+        }
+    }
+
     private void SlowMovement(){    //Dampen current horizontal movement
         float newSpeed = rigi.velocity.x;
 
@@ -345,7 +355,7 @@ public class PlayerController : MonoBehaviour
         }
     }
 
-    public void Move(InputAction.CallbackContext context){
+    public void Move(InputAction.CallbackContext context){  //Set facing direction along with applying move
         currentMove = context.ReadValue<float>();
     }
 

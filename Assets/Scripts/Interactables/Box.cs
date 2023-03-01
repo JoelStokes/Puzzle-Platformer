@@ -20,6 +20,7 @@ public class Box : MonoBehaviour
     private float sizeSubtractY = 0.1f;
     private float sizeSubtractX = 0.1f;
     private float groundedHeight = .1f;
+    private float sideCheckLength = .75f;
     private float maxVelocity = 20f;
 
     private bool isGrounded = false;
@@ -75,9 +76,9 @@ public class Box : MonoBehaviour
         if (isGrounded && !lerping){
             RaycastHit2D raycastHit;
             if (pushedLeft){
-                raycastHit = Physics2D.BoxCast(boxCollider.bounds.center, boxSize, 0f, Vector2.left, groundedHeight, pushLayerMask);
+                raycastHit = Physics2D.BoxCast(boxCollider.bounds.center, boxSize, 0f, Vector2.left, sideCheckLength, pushLayerMask);
             } else {
-                raycastHit = Physics2D.BoxCast(boxCollider.bounds.center, boxSize, 0f, Vector2.right, groundedHeight, pushLayerMask);
+                raycastHit = Physics2D.BoxCast(boxCollider.bounds.center, boxSize, 0f, Vector2.right, sideCheckLength, pushLayerMask);
             }
             if (raycastHit.collider == null){
                 startPos = transform.position;
