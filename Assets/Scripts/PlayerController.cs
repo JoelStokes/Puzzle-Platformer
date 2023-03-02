@@ -87,6 +87,7 @@ public class PlayerController : MonoBehaviour
     private BoxCollider2D boxCollider;
     private ParticleSystem particles;
     private float particlePosition = .5f;
+    private CameraController Camera;
 
     void Start()
     {
@@ -101,6 +102,8 @@ public class PlayerController : MonoBehaviour
         startGravity = rigi.gravityScale;
         oneWayMask = LayerMask.NameToLayer("One-Way");
         playerMask = LayerMask.NameToLayer("Player");
+
+        Camera = GameObject.Find("Main Camera").GetComponent<CameraController>();
     }
 
     void Update()
@@ -148,7 +151,7 @@ public class PlayerController : MonoBehaviour
         SetFacingDirection();
 
         if (transform.position.y < deathFloor){
-            ResetFromFall();
+            Camera.StartFallWipe();
         }
 
         if (isClimbing){
@@ -220,21 +223,6 @@ public class PlayerController : MonoBehaviour
         }
 
         rigi.velocity = Vector2.ClampMagnitude(rigi.velocity, maxVelocity); //Prevent falling too fast, avoid clipping through walls
-    }
-
-    private void ResetFromFall(){   //Compare 2 closest positions to fall point to gague which is safe edge
-        ApplyHurt();
-
-        float right = Mathf.Ceil(groundPos.x) + .5f;
-        float left = Mathf.Floor(groundPos.x) - .5f;
-
-        RaycastHit2D raycastHit = Physics2D.BoxCast(new Vector2(right, groundPos.y), boxCollider.bounds.size, 0f, Vector2.down, groundedHeight, groundLayerMask);
-        if (raycastHit.collider != null){
-            transform.position = new Vector3(right, groundPos.y, transform.position.z);
-        } else {
-            Debug.Log("Applying 2nd. left: " + left + ", right: " + right);
-            transform.position = new Vector3(left, groundPos.y, transform.position.z);
-        }
     }
 
     private bool CheckGrounded(){
@@ -418,6 +406,21 @@ public class PlayerController : MonoBehaviour
             uiController.BreakHeart(health);
         } else {
             //Die
+        }
+    }
+
+    public void ResetFromFall(){   //Compare 2 closest positions to fall point to gague which is safe edge
+        ApplyHurt();
+
+        float right = Mathf.Ceil(groundPos.x) + .5f;
+        float left = Mathf.Floor(groundPos.x) - .5f;
+
+        RaycastHit2D raycastHit = Physics2D.BoxCast(new Vector2(right, groundPos.y), boxCollider.bounds.size, 0f, Vector2.down, groundedHeight, groundLayerMask);
+        if (raycastHit.collider != null){
+            transform.position = new Vector3(right, groundPos.y, transform.position.z);
+        } else {
+            Debug.Log("Applying 2nd. left: " + left + ", right: " + right);
+            transform.position = new Vector3(left, groundPos.y, transform.position.z);
         }
     }
 

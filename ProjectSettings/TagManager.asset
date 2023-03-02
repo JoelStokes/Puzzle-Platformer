@@ -59,3 +59,6 @@ TagManager:
   - name: Close Decoration
     uniqueID: 1480005579
     locked: 0
+  - name: Screen Cover
+    uniqueID: 32716473
+    locked: 0
