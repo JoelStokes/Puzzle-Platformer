@@ -67,6 +67,7 @@ public class PlayerController : MonoBehaviour
 
     //Fall
     private float maxVelocity = 20; //Prevent player from moving too quickly
+    public float deathFloor = -20;
 
     //Powerups
     private bool wallJumpCollected = false;
@@ -76,6 +77,10 @@ public class PlayerController : MonoBehaviour
     private float pushTimer = 0;
     private float pushLim = .15f;
     private float pushYLim = .25f;  // y coordinate needs to be within this to push. Prevent push from top/bottom
+
+    //Health & UI
+    private int health = 3;
+    private UIController uiController;
 
     //Components
     private Rigidbody2D rigi;
@@ -90,6 +95,8 @@ public class PlayerController : MonoBehaviour
         wallJumpLayerMask = LayerMask.GetMask("Ground") | LayerMask.GetMask("Box");
         boxCollider = GetComponent<BoxCollider2D>();
         particles = GetComponent<ParticleSystem>();
+
+        uiController = GameObject.Find("Player UI").GetComponent<UIController>();
 
         startGravity = rigi.gravityScale;
         oneWayMask = LayerMask.NameToLayer("One-Way");
@@ -139,6 +146,10 @@ public class PlayerController : MonoBehaviour
 
     void FixedUpdate() {
         SetFacingDirection();
+
+        if (transform.position.y < deathFloor){
+            ResetFromFall();
+        }
 
         if (isClimbing){
             regrabTimer = regrabLim;
@@ -209,6 +220,21 @@ public class PlayerController : MonoBehaviour
         }
 
         rigi.velocity = Vector2.ClampMagnitude(rigi.velocity, maxVelocity); //Prevent falling too fast, avoid clipping through walls
+    }
+
+    private void ResetFromFall(){   //Compare 2 closest positions to fall point to gague which is safe edge
+        ApplyHurt();
+
+        float right = Mathf.Ceil(groundPos.x) + .5f;
+        float left = Mathf.Floor(groundPos.x) - .5f;
+
+        RaycastHit2D raycastHit = Physics2D.BoxCast(new Vector2(right, groundPos.y), boxCollider.bounds.size, 0f, Vector2.down, groundedHeight, groundLayerMask);
+        if (raycastHit.collider != null){
+            transform.position = new Vector3(right, groundPos.y, transform.position.z);
+        } else {
+            Debug.Log("Applying 2nd. left: " + left + ", right: " + right);
+            transform.position = new Vector3(left, groundPos.y, transform.position.z);
+        }
     }
 
     private bool CheckGrounded(){
@@ -345,7 +371,6 @@ public class PlayerController : MonoBehaviour
         isClimbing = false;
     }
 
-
     public void Jump(InputAction.CallbackContext context){
         if (context.phase == InputActionPhase.Started){
             jumpStarting = true;
@@ -387,16 +412,32 @@ public class PlayerController : MonoBehaviour
         //Add Icon to UI that matches newly collected power
     }
 
+    private void ApplyHurt(){
+        health--;
+        if (health > 0){
+            uiController.BreakHeart(health);
+        } else {
+            //Die
+        }
+    }
+
     void OnTriggerEnter2D(Collider2D other) {
         if (other.tag == "Powerup"){
             SetPowerup(other.GetComponent<Powerup>().currentPower.ToString());
             Destroy(other.gameObject);
         } else if (other.tag == "Hurt"){
-            //Die
+            ApplyHurt();
         } else if (other.tag == "Ladder"){
             nearLadder = true;
             ladderX = other.gameObject.transform.position.x;
             ladderTop = other.gameObject.transform.position.y + ladderTopBuffer;
+        } else if (other.tag == "Health"){
+            if (health < 3){
+                uiController.HealHeart(health);
+                health++;
+            }
+
+            Destroy(other.gameObject);
         }
     }
 

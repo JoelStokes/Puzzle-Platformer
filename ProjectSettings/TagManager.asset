@@ -9,6 +9,7 @@ TagManager:
   - Hurt
   - Level
   - Box
+  - Health
   layers:
   - Default
   - TransparentFX
