@@ -402,9 +402,9 @@ public class PlayerController : MonoBehaviour
 
     private void ApplyHurt(){
         health--;
-        if (health > 0){
-            uiController.BreakHeart(health);
-        } else {
+        uiController.BreakHeart(health);
+
+        if (health <= 0){
             //Die
         }
     }

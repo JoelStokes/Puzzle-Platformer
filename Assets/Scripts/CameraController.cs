@@ -9,9 +9,9 @@ public class CameraController : MonoBehaviour
 
     //Fall Wipe Effect
     public GameObject FallWipe;
-    private Vector3 fallWipeStartPos;
+    private float fallWipeYAdjust = -21;
     private bool playerReset = false;
-    private float fallWipeSpeed = 30;
+    private float fallWipeSpeed = 35;
 
     private Transform player;
     private PlayerController playerScript;
@@ -24,14 +24,13 @@ public class CameraController : MonoBehaviour
         player = PlayerObj.GetComponent<Transform>();
         playerScript = PlayerObj.GetComponent<PlayerController>();
 
-        fallWipeStartPos = FallWipe.transform.position;
         FallWipe.SetActive(false);
     }
 
     void Update()
     {
         if (FallWipe.activeSelf){
-            FallWipe.transform.position = new Vector3(FallWipe.transform.position.x, FallWipe.transform.position.y + (fallWipeSpeed * Time.deltaTime), FallWipe.transform.position.z);
+            FallWipe.transform.position = new Vector3(transform.position.x, FallWipe.transform.position.y + (fallWipeSpeed * Time.deltaTime), FallWipe.transform.position.z);
 
             if (!playerReset && FallWipe.transform.position.y >= 0){
                 playerScript.ResetFromFall();
@@ -39,23 +38,32 @@ public class CameraController : MonoBehaviour
             }
 
             if (FallWipe.transform.position.y > transform.position.y + 25){
-                FallWipe.transform.position = fallWipeStartPos;
+                FallWipe.transform.position = new Vector3(transform.position.x, transform.position.y + fallWipeYAdjust, FallWipe.transform.position.z);
                 FallWipe.SetActive(false);
             }
         }
-        Vector3 newPos = transform.position;
+        
+        float newX, newY;
 
         if (player.position.x > topLeftLim.position.x && player.position.x < bottomRightLim.position.x){
             lookAhead = Mathf.Lerp(lookAhead, (aheadDistance * player.localScale.x), Time.deltaTime * cameraSpeed);
 
-            newPos = new Vector3(player.position.x + lookAhead, newPos.y, newPos.z);
-        } 
-
-        if (player.position.y < topLeftLim.position.y && player.position.y > bottomRightLim.position.y){
-            newPos = new Vector3(newPos.x, player.position.y, newPos.z);
+            newX = player.position.x + lookAhead;
+        } else if (player.position.x <= topLeftLim.position.x) {
+            newX = topLeftLim.position.x + lookAhead;
+        } else {
+            newX = bottomRightLim.position.x + lookAhead;
         }
 
-        transform.position = newPos;
+        if (player.position.y < topLeftLim.position.y && player.position.y > bottomRightLim.position.y){
+            newY = player.position.y;
+        } else if (player.position.y >= topLeftLim.position.y) {
+            newY = topLeftLim.position.y;
+        } else{
+            newY = bottomRightLim.position.y;
+        }
+
+        transform.position = new Vector3(newX, newY, transform.position.z);
     }
 
     public void StartFallWipe(){
