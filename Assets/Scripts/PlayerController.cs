@@ -82,11 +82,17 @@ public class PlayerController : MonoBehaviour
     private int health = 3;
     private UIController uiController;
 
+    //Animation
+    private Animator anim;
+    private float moveAnimThreshold = .05f;
+    //private float wallClingTimer = 0;   //Help prevent jittery wall cling animation
+    //private float wallClingLim = 1f;
+
     //Components
     private Rigidbody2D rigi;
     private BoxCollider2D boxCollider;
     private ParticleSystem particles;
-    private float particlePosition = .5f;
+    private float particlePosition = .25f;
     private CameraController Camera;
 
     void Start()
@@ -96,6 +102,7 @@ public class PlayerController : MonoBehaviour
         wallJumpLayerMask = LayerMask.GetMask("Ground") | LayerMask.GetMask("Box");
         boxCollider = GetComponent<BoxCollider2D>();
         particles = GetComponent<ParticleSystem>();
+        anim = GetComponent<Animator>();
 
         uiController = GameObject.Find("Player UI").GetComponent<UIController>();
 
@@ -145,6 +152,8 @@ public class PlayerController : MonoBehaviour
         if (regrabTimer > 0){
             regrabTimer -= Time.deltaTime;
         }
+
+        ControlAnim();
     }
 
     void FixedUpdate() {
@@ -258,6 +267,31 @@ public class PlayerController : MonoBehaviour
                 }
                 onRightWall = false;
             }   
+        }
+    }
+
+    private void ControlAnim(){
+        /*if (onRightWall || onLeftWall){
+            wallClingTimer = wallClingLim;
+        } else if (wallClingTimer > 0) {
+            wallClingTimer -= Time.deltaTime;
+        }*/
+
+        if ((rigi.velocity.x > moveAnimThreshold || rigi.velocity.x < -moveAnimThreshold) && pushTimer == 0 && !isClimbing && isGrounded){
+            anim.SetTrigger("Moving");
+            anim.SetFloat("Move Speed", Mathf.Abs(rigi.velocity.x));    //Must be absolute value to prevent backwards walking
+        } else if (isClimbing) {
+            anim.SetTrigger("Climbing");
+            anim.SetFloat("Move Speed", rigi.velocity.y);
+        } else if (isGrounded && pushTimer != 0) {
+            anim.SetTrigger("Pushing");
+        } else if (!isGrounded && (onRightWall || onLeftWall)) {
+            anim.SetTrigger("Wallcling");
+        } else if (isGrounded) {
+            anim.SetTrigger("Idling");
+        } else {
+            anim.SetTrigger("Jumping");
+            anim.SetFloat("Jump Force", 12/jumpStartForce);
         }
     }
 
@@ -453,8 +487,6 @@ public class PlayerController : MonoBehaviour
 
     private void OnCollisionStay2D(Collision2D other) {
         if (other.collider.tag == "Box"){
-            Debug.Log("Pushing, Push Time: " + pushTimer + ", Current Move: " + currentMove + ", Y: " + transform.position.y + ", other Y: " + other.gameObject.transform.position.y);
-
             if (isGrounded && !isClimbing && transform.position.y > other.gameObject.transform.position.y - pushYLim && 
                 transform.position.y < other.gameObject.transform.position.y + pushYLim && (currentMove >= .9f - deadZone || currentMove <= -.9f + deadZone)){
                 pushTimer += Time.deltaTime;
