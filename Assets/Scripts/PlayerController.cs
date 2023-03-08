@@ -85,8 +85,17 @@ public class PlayerController : MonoBehaviour
     //Animation
     private Animator anim;
     private float moveAnimThreshold = .05f;
-    //private float wallClingTimer = 0;   //Help prevent jittery wall cling animation
-    //private float wallClingLim = 1f;
+
+    //Level Exit
+    private bool nearExit = false;
+    private bool levelEnding = false;
+    private float endX;
+    private float endXAdjust = .5f;
+    private float lerpTime = 0;
+    private float lerpSpeed = .25f;
+    private Vector2 startScale; 
+    private bool isLerping = false;
+    private Animator doorAnim;
 
     //Components
     private Rigidbody2D rigi;
@@ -111,6 +120,8 @@ public class PlayerController : MonoBehaviour
         playerMask = LayerMask.NameToLayer("Player");
 
         Camera = GameObject.Find("Main Camera").GetComponent<CameraController>();
+
+        startScale = transform.localScale;
     }
 
     void Update()
@@ -149,89 +160,111 @@ public class PlayerController : MonoBehaviour
             }
         }
 
+        if (nearExit && (verticalMove > deadZone) && isGrounded && !levelEnding){
+            levelEnding = true;
+            rigi.isKinematic = true;
+            rigi.velocity = Vector2.zero;
+            transform.position = new Vector3(endX + endXAdjust, transform.position.y, transform.position.z);
+            transform.localScale = new Vector3(Mathf.Abs(transform.localScale.x), transform.localScale.y, transform.localScale.z);
+
+            anim.SetTrigger("Ending");
+            Camera.LevelEnding(endX);
+            doorAnim.SetTrigger("Open");
+
+            //Lerp player size
+        }
+
         if (regrabTimer > 0){
             regrabTimer -= Time.deltaTime;
         }
 
-        ControlAnim();
+        if (!levelEnding){
+            ControlAnim();
+        }
+
+        if (isLerping){
+            EndingLerp();
+        }
     }
 
     void FixedUpdate() {
-        SetFacingDirection();
+        if (!levelEnding){
+            SetFacingDirection();
 
-        if (transform.position.y < deathFloor){
-            Camera.StartFallWipe();
-        }
-
-        if (isClimbing){
-            regrabTimer = regrabLim;
-            rigi.gravityScale = 0;
-            if (transform.position.y < ladderTop || verticalMove < 0){
-                rigi.velocity =  new Vector2(0, verticalMove * ladderSpeed);
-            } else {
-                rigi.velocity =  Vector2.zero;
+            if (transform.position.y < deathFloor){
+                Camera.StartFallWipe();
             }
-            isGrounded = true;
 
-            if (verticalMove < -deadZone && CheckGrounded()){
+            if (isClimbing){
+                regrabTimer = regrabLim;
+                rigi.gravityScale = 0;
+                if (transform.position.y < ladderTop || verticalMove < 0){
+                    rigi.velocity =  new Vector2(0, verticalMove * ladderSpeed);
+                } else {
+                    rigi.velocity =  Vector2.zero;
+                }
+                isGrounded = true;
+
+                if (verticalMove < -deadZone && CheckGrounded()){
+                    StopClimbing();
+                }
+            } else {
+                rigi.gravityScale = startGravity;
+            }
+
+            if (CheckGrounded()){   //Set Grounded
+                groundedTimer = groundedCount;
+                isGrounded = true;
+                groundPos = new Vector2(transform.position.x, transform.position.y);
+            }
+
+            if (!isGrounded){   //Set Walls
+                CheckWalls();
+            } else {
+                onLeftWall = false;
+                onRightWall = false;
+            }
+
+            if (wallJumpTimer <= 0 && !isClimbing){     //Move
+                if (currentMove > deadZone){
+                    ApplyMove(1);
+                } else if (currentMove < -deadZone){
+                    ApplyMove(-1);
+                } else {
+                    SlowMovement();
+                }
+            }
+
+            if (jumpStarting && isGrounded){    //Jump
+                ApplyJump(jumpStartForce);
+                jumpStarting = false;
                 StopClimbing();
+                jumpPressedTimer = 0;
+                groundedTimer = 0;
+            } else if (jumpStarting && ((onLeftWall || onRightWall) || (wallSlideLeftTimer > 0 || wallSlideRightTimer > 0)) && wallJumpTimer <= 0){
+                ApplyWallJump();
+                jumpPressedTimer = 0;
+            } else if (jumpEnding){
+                if (rigi.velocity.y > 0){   //Don't apply jump reduction if apex of jump already hit
+                    ApplyJump(rigi.velocity.y * jumpReleaseMult);
+                }
+                
+                jumpEnding = false;
             }
-        } else {
-            rigi.gravityScale = startGravity;
-        }
 
-        if (CheckGrounded()){   //Set Grounded
-            groundedTimer = groundedCount;
-            isGrounded = true;
-            groundPos = new Vector2(transform.position.x, transform.position.y);
-        }
-
-        if (!isGrounded){   //Set Walls
-            CheckWalls();
-        } else {
-            onLeftWall = false;
-            onRightWall = false;
-        }
-
-        if (wallJumpTimer <= 0 && !isClimbing){     //Move
-            if (currentMove > deadZone){
-                ApplyMove(1);
-            } else if (currentMove < -deadZone){
-                ApplyMove(-1);
+            if (onLeftWall || onRightWall){
+                ApplyWallSlow();
+                if (rigi.velocity.y < 0){   //Only emit particles if sliding downwards
+                    HandleParticles();
+                }
             } else {
-                SlowMovement();
+                if (particles.isEmitting){
+                    particles.Stop();
+                }
             }
-        }
 
-        if (jumpStarting && isGrounded){    //Jump
-            ApplyJump(jumpStartForce);
-            jumpStarting = false;
-            StopClimbing();
-            jumpPressedTimer = 0;
-            groundedTimer = 0;
-        } else if (jumpStarting && ((onLeftWall || onRightWall) || (wallSlideLeftTimer > 0 || wallSlideRightTimer > 0)) && wallJumpTimer <= 0){
-            ApplyWallJump();
-            jumpPressedTimer = 0;
-        } else if (jumpEnding){
-            if (rigi.velocity.y > 0){   //Don't apply jump reduction if apex of jump already hit
-                ApplyJump(rigi.velocity.y * jumpReleaseMult);
-            }
-            
-            jumpEnding = false;
+            rigi.velocity = Vector2.ClampMagnitude(rigi.velocity, maxVelocity); //Prevent falling too fast, avoid clipping through walls
         }
-
-        if (onLeftWall || onRightWall){
-            ApplyWallSlow();
-            if (rigi.velocity.y < 0){   //Only emit particles if sliding downwards
-                HandleParticles();
-            }
-        } else {
-            if (particles.isEmitting){
-                particles.Stop();
-            }
-        }
-
-        rigi.velocity = Vector2.ClampMagnitude(rigi.velocity, maxVelocity); //Prevent falling too fast, avoid clipping through walls
     }
 
     private bool CheckGrounded(){
@@ -270,6 +303,11 @@ public class PlayerController : MonoBehaviour
         }
     }
 
+    public void BeginLerp(){
+        isLerping = true;
+        Camera.ShrinkCircle();
+    }
+
     private void ControlAnim(){
         /*if (onRightWall || onLeftWall){
             wallClingTimer = wallClingLim;
@@ -293,6 +331,12 @@ public class PlayerController : MonoBehaviour
             anim.SetTrigger("Jumping");
             anim.SetFloat("Jump Force", 12/jumpStartForce);
         }
+    }
+
+    private void EndingLerp(){
+        lerpTime += (Time.deltaTime * lerpSpeed);
+        transform.localScale = Vector2.Lerp(startScale, Vector2.zero, lerpTime);
+        transform.position = new Vector3(Mathf.Lerp(endX + endXAdjust, endX - endXAdjust, lerpTime), transform.position.y, transform.position.z);
     }
 
     private void HandleParticles(){
@@ -475,6 +519,11 @@ public class PlayerController : MonoBehaviour
             }
 
             Destroy(other.gameObject);
+        } else if (other.tag == "Exit"){
+            //Get type of exit (Secret or Default)
+            nearExit = true;
+            endX = other.transform.position.x;
+            doorAnim = other.GetComponent<Animator>();
         }
     }
 
@@ -482,6 +531,8 @@ public class PlayerController : MonoBehaviour
         if (other.tag == "Ladder"){
             nearLadder = false;
             isClimbing = false;
+        } else if (other.tag == "Exit"){
+            nearExit = false;
         }
     }
 
